@@ -1,0 +1,463 @@
+---
+title: "Problem set 2"
+author: "Eric Helfrich"
+date: "9/30/2019"
+---
+
+# Details
+
+- Who did you collaborate with: N/A
+- Approximately how much time did you spend on this problem set: 4 hours
+- What, if anything, gave you the most trouble: ggscatterstats package had some issues with getting the first example from the github page.
+
+## Instructions
+
+In addition to running the code, you will need to do two things: either write in complete sentences a response or write R code to fill in a chunk.
+
+- "xxxxx" = Write, in complete English sentences, your response. 1-2 sentences is sufficient.
+
+- "**Plot**" = Write R code in the chunk corresponding to the instructions.
+
+# Analyzing CMPD Traffic Stops
+
+For this problem set, we'll examine a data set of stops by the Charlotte-Mecklenburg Police Department (CMPD). 
+
+Our focus will be to understand what factors are related to whether someone is searched or not for a traffic stop.
+
+For our data set, you'll load the csv file we saved in the setup. This should be in your data folder.
+
+```{r load-packages-data, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(scales)
+library(ggspatial) # make sure to install if you don't have it
+
+df <- read_csv("data/Officer_Traffic_Stops.csv")
+```
+
+## Demographics of drivers
+
+First, look at the data using the `glimpse()` function from `dplyr`
+
+```{r glimpse}
+glimpse(df)
+```
+
+Notice the different variable types: character (chr), num (numeric), and datetime (POSIXct).
+
+Let's consider our target variable: `Was_a_Search_Conducted`.
+
+**Plot** a bar chart that counts the number of records by `Was_a_Search_Conducted`.
+
+```{r bar}
+
+ggplot(df, aes(x=Was_a_Search_Conducted)) +
+  geom_bar()
+
+```
+
+How well balanced is the data set by this field? 
+
+- The dataset is highly skewed to the no category.  
+
+Next, let's consider the age range of the driver. 
+
+**Plot** a histogram of `Driver_Age`. Determine an appropriate number of bins.
+
+```{r histogram}
+
+ggplot(df, aes(x=Driver_Age)) +
+  geom_histogram(bins=30)
+
+```
+
+Once you go above (around) 40-50 bins, you'll notice some points stick out. 
+
+What is happening? 
+- This is the tendancy for self reported ages to be grouped around certain common ages.    
+
+**Plot** a density plot of `Driver_Age`. Add in a fill to be "lightblue". Determine an appropriate kernel density to use (`adjust`).
+
+```{r density}
+ggplot(df, aes(x=Driver_Age)) +
+  geom_density(adjust = 2, fill = 'light blue')
+
+```
+
+**Plot** a box plot with `Was_a_Search_Conducted` on the x-axis and `Driver_Age` on the y-axis.
+
+```{r boxplot}
+ggplot(df, aes(x=Was_a_Search_Conducted, y=Driver_Age)) +
+  geom_boxplot()
+
+```
+
+**Plot** a violin plot.
+
+```{r violin}
+ggplot(df, aes(x=Was_a_Search_Conducted, y=Driver_Age)) +
+  geom_violin()
+
+```
+
+From the plots above, do you think the age of the driver is a significant factor in whether a search was conducted? Why or why not? 
+- It does not look like age is a significant factor since the distrobutions are realitively simlar in shape.
+While the 'yes' category skews younger more than the 'no' category it is not distinct enough to determine signficance by just a glance. 
+
+## Date of stop
+
+Let's plot the number of stops by time. 
+
+Recalling part one, the `Month_of_Stop` variable is a character, not a date variable. The datatime's are simply when the data was collected; not when the stop occurred. Therefore, we'll need to convert the `Month_of_Stop` variable from a character to a Date format.
+
+Let's first cleanup the date field using `tidyverse` packages like `stringr` and `lubridate`.
+
+```{r date-cleanup, message=F, warning=F}
+library(stringr); library(lubridate)
+
+# see https://dsba5122fall2019.slack.com/archives/CLUCHHQPJ/p1569273552006200
+df <- mutate(df, Month_of_Stop = str_replace_all(Month_of_Stop, "/","-")) # replace "/" with "-"
+df <- mutate(df, Month_of_Stop = paste0(df$Month_of_Stop,"-01")) # add in day
+df <- mutate(df, Date = ymd(Month_of_Stop)) # created a date field
+```
+
+**Plot** a line chart with the number of traffic stops for each month (hint: start with the `count()` function by Date then feed into ggplot. Remember the count variable is named 'n'.).
+
+```{r stops}
+# https://ro-che.info/articles/2017-02-22-group_by_month_r
+# df %>%
+#   group_by(month=floor_date(Date, "month")) %>%
+#   summarize(amount=n()) %>%
+#   ggplot(aes(x=month, y=amount)) +
+#   geom_line()
+
+df %>%
+  count(Date) %>%
+  ggplot(aes(x=Date, y=n)) +
+  geom_line()
+
+```
+
+What is the trend (i.e., long term rate of change) of the number of traffic stops in Charlotte? 
+- The number of traffic stops has slightly decreased overtime on avg.  
+
+**Plot** the same plot but add in `facet_wrap()` by the `Reason_for_Stop` variable.
+
+```{r stops-by-reason}
+df %>%
+  group_by(Reason_for_Stop) %>%
+  count(Date) %>%
+  ggplot(aes(x=Date, y=n)) +
+  geom_line() +
+  facet_wrap(~Reason_for_Stop)
+
+```
+
+What is a problem with this plot? 
+- They are all on the same scale
+
+To address this problem, you will need to figure out how to adjust the scale. To do this, you need to use R's documentation to see whether there is a parameter in `facet_wrap`.
+
+Go to your RStudio console and type `?facet_wrap`.
+
+What parameter allows you to modify the scales of `facet_wrap`? 
+- add the scales agrument with the value 'free' to the facet_wrap() function.
+
+**Plot** the same plot but with a free y-axis scale.
+
+```{r stops-by-reason-2}
+df %>%
+  group_by(Reason_for_Stop) %>%
+  count(Date) %>%
+  ggplot(aes(x=Date, y=n)) +
+  geom_line() +
+  facet_wrap(~Reason_for_Stop, scales='free')
+
+```
+
+Which type of police stop has had the most volatility (i.e., big swings in number of stops)? 
+- Vehicle Regulatory had the most volatility.
+
+What is one problem with allowing the y-axis be free? 
+- You lose the ability to compare each of the different graphs to each other because they lack a common scale.
+
+Small multiples tends to be less effective when each of the variables are on different scales or magnitudes.
+
+Let's consider instead CMPD traffic stops but by CMPD division. These are more even spread by division than the type of stop.
+
+**Plot** a line chart (optional points too) for stops by `Date` (x axis) and counts ('n', or whatever you named your count variable) (y axis). (hint: to modify how the date is shown, use the layer `scale_x_date(date_labels = "%Y") +` to show only the year. Feel free to modify by looking at `?scale_x_date`.)
+
+```{r stops-by-division}
+df %>%
+  group_by(CMPD_Division) %>%
+  count(Date) %>%
+  ggplot(aes(x=Date, y=n)) +
+  geom_line() +
+  facet_wrap(~CMPD_Division) +
+  scale_x_date(date_labels = "%Y")
+
+```
+
+What are three observations you can make about the number of police stops by divison? (hint: just write about what's in the data.)
+
+1. Eastway, North, and North Tryon divisions all have spikes in stops after 2017.
+
+2. Most of the divisons had a declining number of stops for the 2016 year.
+
+3. The metro division looks to have the least amount of volatility.
+
+Next, this doesn't help tell us where these areas are. For that, let's use a shape file to create a chloropleth of stops by division.
+
+## Geography
+
+For this example, we'll create a cholorpleth for the number of police stops by police division.
+
+To do this, we need to use the `sf` package. (For help along the way, see [this tutorial](http://strimas.com/r/tidy-sf/) on `sf` package.)
+
+```{r load-sf, message=F, warning=F}
+library(sf); library(viridis)
+
+cmpd <- st_read("./data/CMPD_Police_Divisions/CMPD_Police_Divisions.shp")
+```
+
+Note that while we have five files, we only load in the shapefile (`.shp`) file. This is typical but know that to use this file you would need the other four files in the same folder as your shapefile.
+
+**Plot** cmpd using the `geom_sf` package where you provide `fill = DNAME` as the only aesthetic. Add in a title saying "CMPD Divisions" and add the `theme_bw()` theme to make translate the file into the black and white template.
+
+```{r geom_sf}
+ggplot(cmpd, aes(fill=DNAME)) +
+  geom_sf() +
+  theme_bw() +
+  ggtitle("CMPD Divisions")
+
+```
+
+One problem with this map is it's hard to read the division names. That is, it may be better to remove the legend and put the labels of each division within the plot.
+
+To do this, we can use the related `geom_sf_label()` geom, using the name of the division as the aesthetic label.
+
+**Plot** the same plot from above but with the name of the division as the label. 
+
+1. You'll likely need to reduce the size of the label, using the `size` paramater. You should likely set the `size` to under 2. 
+
+2. Make sure to remove the legend (it's redundant and no longer necessary).
+
+3. Create a new variable named `Name` that removes the term " Division". This term is redundant and takes up a lot of space in the labels from `DNAME`. To do this step, use this snippet of code at the top of your pipeline:
+
+```{r eval=F}
+cmpd %>%
+  mutate(Name = as.character(DNAME)) %>%
+  mutate(Name = str_replace_all(Name, " Division",""))
+```
+
+4. Save it as an object named `g`. Make sure to call it once so that the map will output.
+
+```{r geom-labels, message=F, warning=F}
+g = cmpd %>%
+  mutate(Name = as.character(DNAME)) %>%
+  mutate(Name = str_replace_all(Name, " Division","")) %>%
+  ggplot(aes(fill=DNAME)) +
+  geom_sf() +
+  geom_sf_label(aes(label=Name), size=1.75) +
+  theme_bw() +
+  theme(legend.position = 'none') +
+  ggtitle("CMPD Divisions")
+
+g
+
+```
+
+## Advanced Plot:
+
+Now, let's create a chloropleth. Below is the code to create an advanced plot.
+
+In this problem, you need to explain what each step below is doing:
+
+- `mutate()`: Creates a new variable with the DNAME variable
+- `inner_join()`: joins the CMPD shapefile to the traffice stops dataframe by comparing the CMPD_Division column in both datasets
+- `mutate()`: Creates a new Year column by parsing the year from the Date column
+- `geom_sf()`: constructs a shape file plot with the fill as the number of traffic stops
+- `scale_fill_viridis()`: change the fill to the virdis color scale and creates a legend for the fill
+- `labs()`: adds the title and the caption
+- `annotation_scale()`: sets the location and size of the scale bar on the plots
+- `facet_wrap()`: performs a facet by years
+- `theme_bw()`: sets the plot the the black and white theme
+- `theme()`: (what are each of the options doing in `theme()`?) This is setting the legend posistion, changing the size and text stype of the title, getting rid of the x and y axis lables, and removing the tick marks from the X and Y axis.
+- `ggsave()`: This is saving the plot into a PDF and a PNG file
+
+```{r adv-plot}
+cmpd_chloropleth <- cmpd %>% 
+  mutate(CMPD_Division = as.character(DNAME)) %>% 
+  inner_join(count(df, CMPD_Division, Date), by = "CMPD_Division") %>%
+  mutate(Year = lubridate::year(Date)) %>%
+  ggplot() +
+  geom_sf(aes(fill = n)) +
+  scale_fill_viridis("Traffic Stops", labels = scales::comma) +
+  labs(title = "CMPD Traffic stops by CMPD Division",
+       caption = "Source: CMPD") +
+  annotation_scale(location = "bl", width_hint = 0.2) +
+  facet_wrap(~Year) +  
+  theme_bw() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(face = "bold", size = rel(1.5)),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_blank())
+
+cmpd_chloropleth
+
+ggsave(cmpd_chloropleth, filename = "cmpd_chloropleth.pdf",
+       width = 7, height = 5, units = "in")
+ggsave(cmpd_chloropleth, filename = "cmpd_chloropleth.png",
+       width = 7, height = 5, units = "in")
+```
+
+
+## Choosing a ggplot extensions 
+
+Go to [ggextensions website](https://www.ggplot2-exts.org/). Then click Galleries to explore the different ggplot extensions. Scroll through and see if any catch your eye.
+
+Now, select **one** of the ggextension libraries below and install the package (through CRAN):
+
+- [`ggridges`](https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html) / [example to recreate](https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html#varying-fill-colors-along-the-x-axis) - [Run both plots. Make sure to install the `viridis` package or else you'll get an error!]
+
+- [`ggalt`](https://github.com/hrbrmstr/ggalt) / [example to recreate](https://github.com/hrbrmstr/ggalt#horzon-chart) - [Make sure to install `hrbrthemes`!]
+
+- [`ggrepel`](https://github.com/slowkow/ggrepel) / [example to recreate](https://github.com/slowkow/ggrepel/blob/master/vignettes/ggrepel.md#align-labels-on-the-left-or-right-edge)
+
+- [`ggstatsplot`](https://github.com/IndrajeetPatil/ggstatsplot) / [example to recreate](https://github.com/IndrajeetPatil/ggstatsplot#ggscatterstats) - [Run all three examples in the `ggscatterstats` section.]
+
+**Plot** the related example
+
+```{r ggextension-examples, message=F, warning=F}
+
+# Load required libraries
+library(ggstatsplot)
+library(hrbrthemes)
+library(ggExtra)
+library(grid)
+
+one = ggstatsplot::ggscatterstats(
+  data = ggplot2::msleep,
+  x = sleep_rem,
+  y = awake,
+  xlab = "REM sleep (in hours)",
+  ylab = "Amount of time spent awake (in hours)",
+  title = "Understanding mammalian sleep",
+  messages = FALSE
+)
+grid::grid.newpage()
+grid::grid.draw(one)
+
+```
+
+```{r ggextension-examples-2}
+
+# for reproducibility
+set.seed(123)
+
+# plot
+two <- ggstatsplot::ggscatterstats(
+  data = dplyr::filter(.data = ggstatsplot::movies_long, genre == "Action"),
+  x = budget,
+  y = rating,
+  type = "robust", # type of test that needs to be run
+  conf.level = 0.99, # confidence level
+  xlab = "Movie budget (in million/ US$)", # label for x axis
+  ylab = "IMDB rating", # label for y axis
+  label.var = "title", # variable for labeling data points
+  label.expression = "rating < 5 & budget > 100", # expression that decides which points to label
+  line.color = "yellow", # changing regression line color line
+  title = "Movie budget and IMDB rating (action)", # title text for the plot
+  caption = expression( # caption text for the plot
+    paste(italic("Note"), ": IMDB stands for Internet Movie DataBase")
+  ),
+  ggtheme = hrbrthemes::theme_ipsum_ps(), # choosing a different theme
+  ggstatsplot.layer = FALSE, # turn off ggstatsplot theme layer
+  marginal.type = "density", # type of marginal distribution to be displayed
+  xfill = "#0072B2", # color fill for x-axis marginal distribution
+  yfill = "#009E73", # color fill for y-axis marginal distribution
+  xalpha = 0.6, # transparency for x-axis marginal distribution
+  yalpha = 0.6, # transparency for y-axis marginal distribution
+  centrality.para = "median", # central tendency lines to be displayed
+  messages = FALSE # turn off messages and notes
+)
+two
+
+# for reproducibility
+set.seed(123)
+
+# plot
+three = ggstatsplot::grouped_ggscatterstats(
+  data = dplyr::filter(
+    .data = ggstatsplot::movies_long,
+    genre %in% c("Action", "Action Comedy", "Action Drama", "Comedy")
+  ),
+  x = rating,
+  y = length,
+  label.var = title,
+  label.expression = length > 200,
+  conf.level = 0.99,
+  k = 3, # no. of decimal places in the results
+  xfill = "#E69F00",
+  yfill = "#8b3058",
+  xlab = "IMDB rating",
+  grouping.var = genre, # grouping variable
+  title.prefix = "Movie genre",
+  ggtheme = ggplot2::theme_grey(),
+  ggplot.component = list(
+    ggplot2::scale_x_continuous(breaks = seq(2, 9, 1), limits = (c(2, 9)))
+  ),
+  messages = FALSE,
+  nrow = 2,
+  title.text = "Relationship between movie length by IMDB ratings for different genres"
+)
+three
+
+```
+
+
+Now, with the same package you ran, make a **plot** with that package and the gapminder data. You can choose any of the data frames (i.e., years). Make sure your plot has at least six functions (e.g., ggplot() + geom_point() is two functions and `dplyr` functions count as well.)
+
+```{r ggextension-custom}
+library(gapminder)
+
+h = gapminder %>%
+  filter(pop < 10000000) %>%
+  group_by(country) %>%
+  ggscatterstats(year, gdpPercap, type = 'parametric', marginal = F) +
+  scale_y_log10() +
+  labs(title="GDP per Capital for countries with pop under 10 Million")
+
+h
+#grid::grid.newpage()
+#grid::grid.draw(h)
+  
+
+```
+
+Describe what you have found using that plot (write at least 3 sentences): 
+- Countries with population under 10 million are tightly grouped together with only some outliers that have a high GDP per capita.
+- This shows that the variable year is statistically significant in determining the GDP per capital for the countries.
+- Growth of these countries is positive over time.
+
+## Intro to interactivity
+
+For even more fun, **plot** an interactive HTML plot using the code for any of the plots above (fair warning, some of the ggextensions may not work well). 
+
+The easiest way to do this is to use the `plotly` package (install it with the "Packages" panel in RStudio), and then to use its `ggplotly()` function.
+
+I've given you some commented-out code below (commented out so that R doesn't yell at you about the code not working when you knit). 
+
+Also, check out [the documentation](https://plot.ly/ggplot2/), especially [this page](https://plot.ly/ggplot2/interactive-tooltip/) about customizing the tooltips that show up when you hover over points or areas.
+
+```{r interactive, message=FALSE}
+library(plotly)
+# 
+my_cool_plot = ggplot(df, aes(x=Was_a_Search_Conducted, y=Driver_Age)) +
+  geom_violin()
+#
+my_cool_plot
+# 
+ggplotly(my_cool_plot)
+```
